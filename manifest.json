@@ -9,12 +9,12 @@
     {
       "src": "https://i.imgur.com/mItyTOA.jpeg",
       "sizes": "192x192",
-      "type": "https://i.imgur.com/mItyTOA.jpeg"
+      "type": "image/png"
     },
     {
       "src": "https://i.imgur.com/mItyTOA.jpeg",
       "sizes": "512x512",
-      "type": "https://i.imgur.com/mItyTOA.jpeg"
+      "type": "image/png"
     }
   ]
 }
