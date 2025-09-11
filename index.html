@@ -12,9 +12,7 @@
 <body>
   <div id="player"></div>
   <script>
-    // Link da Pluto (sem placeholders!)
-    var originalLink = "https://service-stitcher.clusters.pluto.tv/v1/stitch/embed/hls/channel/5f12136385bccc00070142ed/master.m3u8?advertisingId={PSID}&appVersion=unknown&deviceDNT={TARGETOPT}&deviceId={PSID}&deviceLat=0&deviceLon=0&deviceMake=samsung&deviceModel=samsung&deviceType=samsung-tvplus&deviceVersion=unknown
-";
+    var originalLink = "https://service-stitcher.clusters.pluto.tv/stitch/hls/channel/5f12136385bccc00070142ed/master.m3u8?deviceType=web&deviceMake=Chrome&deviceModel=Chrome&sid=123&deviceId=123&deviceVersion=96&appVersion=1&deviceDNT=0&userId=123";
 
     var player = new Clappr.Player({
       source: "proxy.php?url=" + encodeURIComponent(originalLink),
@@ -27,4 +25,3 @@
   </script>
 </body>
 </html>
-
