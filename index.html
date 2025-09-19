@@ -1,170 +1,31 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Editor de Foto & Designer</title>
-<style>
-body { margin:0; font-family:'Segoe UI', sans-serif; display:flex; height:100vh; background:#f7f8fb; color:#333; }
-#sidebar { width:340px; background:#fff; border-right:1px solid #ddd; display:flex; flex-direction:column; box-shadow:2px 0 8px rgba(0,0,0,.05); overflow-y:auto; padding:16px; }
-#sidebar h3 { margin:12px 0 6px; font-size:16px; color:#444; }
-#sidebar input, #sidebar select, #sidebar button { width:100%; padding:8px 10px; margin:4px 0; border:1px solid #ccc; border-radius:6px; font-size:14px; }
-#sidebar button { cursor:pointer; background:#4a90e2; color:#fff; border:none; transition:background .2s; }
-#sidebar button:hover { background:#357abd; }
-#sidebar .danger { background:#e94e4e; }
-#sidebar .danger:hover { background:#c0392b; }
-canvas { background:#fff; margin:auto; border:1px solid #ddd; box-shadow:0 4px 12px rgba(0,0,0,.1); border-radius:8px; }
-.thumbnail { width:50px; height:50px; margin:4px; cursor:pointer; border:1px solid #ccc; border-radius:4px; object-fit:contain; }
-.thumbnails { display:flex; flex-wrap:wrap; }
-.filter-control { display:flex; align-items:center; gap:6px; margin:4px 0; }
-.filter-control label { flex:1; font-size:13px; color:#555; }
-.filter-control input { flex:1; }
-.project-item { background:#f9f9f9; margin:4px 0; padding:8px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; font-size:13px; }
-.project-item strong { display:block; font-size:14px; margin-bottom:2px; }
-</style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player Pluto TV</title>
+    <link rel="icon" type="image/png" href="/play-on.png">
+    <style>
+        body {
+            margin: 0;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #player {
+            width: 90%;
+            max-width: 1280px;
+            aspect-ratio: 16 / 9;
+        }
+    </style>
 </head>
 <body>
-<div id="sidebar">
-<h3>Projetos</h3>
-<input id="projectName" placeholder="Nome do projeto" />
-<button id="saveBtn">Salvar</button>
-<button id="saveAsBtn">Salvar como novo</button>
-<button id="clearBtn" class="danger">Novo projeto</button>
-<h3>Meus Projetos</h3>
-<div id="projectsList"></div>
+    <div id="player"></div>
 
-<h3>Adicionar elementos</h3>
-<input type="file" id="imgUpload" accept="image/*" />
-<input id="textInput" placeholder="Digite um texto" />
-<button id="addTextBtn">Adicionar Texto</button>
-
-<h3>Estilo do Texto</h3>
-<select id="fontSelect">
-<option value="Arial">Arial</option>
-<option value="Helvetica">Helvetica</option>
-<option value="Times New Roman">Times New Roman</option>
-<option value="Courier New">Courier New</option>
-<option value="Impact">Impact</option>
-</select>
-<input type="color" id="fillColor" value="#000000" />
-<input id="fontSize" type="number" value="36" />
-<button id="boldBtn">Negrito</button>
-<button id="italicBtn">Itálico</button>
-
-<h3>Formas</h3>
-<button id="addRect">Quadrado</button>
-<button id="addCircle">Círculo</button>
-<button id="addLine">Linha</button>
-
-<h3>Stickers</h3>
-<div class="thumbnails" id="stickers">
-<img src="https://cdn-icons-png.flaticon.com/128/616/616408.png" class="thumbnail">
-<img src="https://cdn-icons-png.flaticon.com/128/616/616408.png" class="thumbnail">
-</div>
-<input type="file" id="stickerUpload" accept="image/*" />
-
-<h3>Fundos</h3>
-<div class="thumbnails" id="backgrounds">
-<div class="thumbnail" style="background:linear-gradient(135deg,#ff9a9e,#fad0c4)"></div>
-<div class="thumbnail" style="background:linear-gradient(135deg,#a1c4fd,#c2e9fb)"></div>
-</div>
-<input type="color" id="bgColor" />
-<input type="file" id="bgUpload" accept="image/*" />
-
-<h3>Filtros</h3>
-<div class="filter-control"><label>Brilho</label><input type="range" id="brightness" min="-1" max="1" step="0.1" value="0"></div>
-<div class="filter-control"><label>Contraste</label><input type="range" id="contrast" min="-1" max="1" step="0.1" value="0"></div>
-<div class="filter-control"><label>Saturação</label><input type="range" id="saturation" min="-1" max="1" step="0.1" value="0"></div>
-<div class="filter-control"><label>Blur</label><input type="range" id="blur" min="0" max="1" step="0.05" value="0"></div>
-
-<h3>Exportar</h3>
-<button id="exportPNG">Salvar em PNG</button>
-<button id="exportJPG">Salvar em JPG</button>
-<button id="exportPDF">Salvar em PDF</button>
-
-<h3>Selecionado</h3>
-<div id="selInfo">Nenhum</div>
-<button id="bringFront">Trazer para frente</button>
-<button id="sendBack">Enviar para trás</button>
-<button id="deleteObj" class="danger">Excluir</button>
-</div>
-
-<canvas id="c" width="1024" height="768"></canvas>
-
-<script>
-const canvas = new fabric.Canvas('c', { backgroundColor:'#fff' });
-
-// IndexedDB para projetos
-let db;
-const request = indexedDB.open('EditorDB',1);
-request.onupgradeneeded = e => { db = e.target.result; db.createObjectStore('projects',{keyPath:'name'}); };
-request.onsuccess = e => { db = e.target.result; loadProjects(); };
-
-function saveProject(name){
-  const tx = db.transaction('projects','readwrite');
-  const store = tx.objectStore('projects');
-  const data = { name, content: canvas.toJSON() };
-  store.put(data);
-  loadProjects();
-}
-
-function loadProjects(){
-  const tx = db.transaction('projects','readonly');
-  const store = tx.objectStore('projects');
-  const list = document.getElementById('projectsList');
-  list.innerHTML='';
-  store.openCursor().onsuccess=e=>{
-    const cursor = e.target.result;
-    if(cursor){
-      const div=document.createElement('div');
-      div.className='project-item';
-      div.innerHTML=`<strong>${cursor.key}</strong><div><button onclick="loadProject('${cursor.key}')">Abrir</button></div>`;
-      list.appendChild(div);
-      cursor.continue();
-    }
-  };
-}
-
-function loadProject(name){
-  const tx = db.transaction('projects','readonly');
-  const store = tx.objectStore('projects');
-  store.get(name).onsuccess=e=>{
-    const data=e.target.result;
-    if(data){ canvas.loadFromJSON(data.content, ()=>canvas.renderAll() ); }
-  };
-}
-
-document.getElementById('saveBtn').addEventListener('click',()=>{ const n=document.getElementById('projectName').value||'Projeto'; saveProject(n); });
-
-document.getElementById('clearBtn').addEventListener('click',()=>{ canvas.clear(); canvas.backgroundColor='#fff'; canvas.renderAll(); });
-
-// Upload de imagens
-document.getElementById('imgUpload').addEventListener('change', e => {
-  const file = e.target.files[0]; if(!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    fabric.Image.fromURL(ev.target.result, img => {
-      img.set({ left:50, top:50, scaleX: 0.5, scaleY: 0.5 });
-      canvas.add(img).setActiveObject(img);
-    });
-  };
-  reader.readAsDataURL(file);
-});
-
-// Texto
-document.getElementById('addTextBtn').addEventListener('click', ()=>{
-  const t = new fabric.Textbox(document.getElementById('textInput').value || 'Texto', {
-    left:50, top:50, fontFamily: document.getElementById('fontSelect').value,
-    fill: document.getElementById('fillColor').value, fontSize: Number(document.getElementById('fontSize').value)
-  });
-  canvas.add(t).setActiveObject(t);
-});
-
-// Formas
-document.getElementById('addRect').addEventListener('click', ()=>{
-  canvas.add(new fabric.Rect({ width:100, height:100, left:50, top:50, fill:'#ff5722' })).setActiveObject(canvas.item(canvas.size()-1));
-});
-document.getElementById('addCircle').addEventListener('click', ()=>{
-  canvas.add(new fabric.Circle({ radius:50, left:50, top:50, fill:'#4caf50
+    <!-- JW Player -->
+    <script src="/js/jwplayer.js"></script>
+    <script src="player.js"></script>
+</body>
+</html>
