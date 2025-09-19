@@ -4,7 +4,8 @@ const channels = [
   {
     name: "KRON SF",
     category: "News, Local",
-    url: "https://difwk89tryvik.cloudfront.net/v1/master/dfe581e0a446a1e548014078b2d81b62b917979d/KRON_AD_CAMPAIGN/index.m3u8"
+    url: "https://service-stitcher.clusters.pluto.tv/v1/stitch/embed/hls/channel/5f12136385bccc00070142ed/master.m3u8?advertisingId={PSID}&appVersion=unknown&deviceDNT={TARGETOPT}&deviceId={PSID}&deviceLat=0&deviceLon=0&deviceMake=samsung&deviceModel=samsung&deviceType=samsung-tvplus&deviceVersion=unknown
+"
   },
   {
     name: "KGO SF",
