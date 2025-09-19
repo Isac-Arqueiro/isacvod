@@ -1,27 +1,139 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <title>Player Pluto Proxy</title>
-  <script src="https://cdn.jsdelivr.net/npm/clappr@latest/dist/clappr.min.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Editor de Foto & Designer</title>
   <style>
-    body, html { margin:0; padding:0; height:100%; background:#000; }
-    #player { width:100%; height:100%; }
+    body { margin:0; font-family: 'Segoe UI', sans-serif; display:flex; height:100vh; background:#f7f8fb; color:#333 }
+    #sidebar { width:320px; background:#fff; border-right:1px solid #ddd; display:flex; flex-direction:column; box-shadow:2px 0 8px rgba(0,0,0,.05); }
+    #sidebar h3 { margin:12px 0 6px; font-size:16px; color:#444 }
+    #sidebar input, #sidebar select, #sidebar button { width:100%; padding:8px 10px; margin:4px 0; border:1px solid #ccc; border-radius:6px; font-size:14px }
+    #sidebar button { cursor:pointer; background:#4a90e2; color:#fff; border:none; transition:background .2s }
+    #sidebar button:hover { background:#357abd }
+    #sidebar .danger { background:#e94e4e }
+    #sidebar .danger:hover { background:#c0392b }
+    .project-item { background:#f9f9f9; margin:4px 0; padding:8px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; font-size:13px }
+    .project-item strong { display:block; font-size:14px; margin-bottom:2px }
+    .project-item button { width:auto; margin-left:6px; padding:4px 8px; font-size:12px }
+
+    #canvas-wrap { flex:1; display:flex; flex-direction:column; }
+    #controls { padding:10px; background:#fff; border-bottom:1px solid #ddd; display:flex; align-items:center; gap:10px; box-shadow:0 2px 6px rgba(0,0,0,.05); }
+    #controls strong { font-size:15px; color:#555 }
+    #controls select { padding:6px 10px; border:1px solid #ccc; border-radius:6px; font-size:13px }
+
+    canvas { background:#fff; margin:auto; border:1px solid #ddd; box-shadow:0 4px 12px rgba(0,0,0,.1); border-radius:8px }
+    #selInfo { background:#f1f1f1; padding:6px; border-radius:4px; font-size:13px; margin-top:6px }
+    .filter-control { display:flex; align-items:center; gap:6px; margin:4px 0 }
+    .filter-control label { flex:1; font-size:13px; color:#555 }
+    .filter-control input { flex:1 }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
-  <div id="player"></div>
-  <script>
-    var originalLink = "https://service-stitcher.clusters.pluto.tv/stitch/hls/channel/5f12136385bccc00070142ed/master.m3u8?deviceType=web&deviceMake=Chrome&deviceModel=Chrome&sid=123&deviceId=123&deviceVersion=96&appVersion=1&deviceDNT=0&userId=123";
+  <div id="sidebar">
+    <div style="padding:16px; overflow-y:auto; flex:1">
+      <h3>Projetos</h3>
+      <input id="projectName" placeholder="Nome do projeto" />
+      <button id="saveBtn">Salvar</button>
+      <button id="saveAsBtn">Salvar como novo</button>
+      <button id="clearBtn" class="danger">Novo projeto</button>
+      <h3>Meus Projetos</h3>
+      <div id="projectsList"></div>
 
-    var player = new Clappr.Player({
-      source: "proxy.php?url=" + encodeURIComponent(originalLink),
-      parentId: "#player",
-      autoPlay: true,
-      width: "100%",
-      height: "100%",
-      mimeType: "application/x-mpegURL"
+      <h3>Adicionar elementos</h3>
+      <input type="file" id="imgUpload" accept="image/*" />
+      <input id="textInput" placeholder="Digite um texto" />
+      <button id="addTextBtn">Adicionar Texto</button>
+
+      <h3>Estilo do Texto</h3>
+      <select id="fontSelect">
+        <option value="Arial">Arial</option>
+        <option value="Helvetica">Helvetica</option>
+        <option value="Times New Roman">Times New Roman</option>
+        <option value="Courier New">Courier New</option>
+        <option value="Impact">Impact</option>
+      </select>
+      <input type="color" id="fillColor" value="#000000" />
+      <input id="fontSize" type="number" value="36" />
+      <button id="boldBtn">Negrito</button>
+      <button id="italicBtn">Itálico</button>
+
+      <h3>Filtros de Imagem</h3>
+      <div class="filter-control"><label>Brilho</label><input type="range" id="brightness" min="-1" max="1" step="0.1" value="0"></div>
+      <div class="filter-control"><label>Contraste</label><input type="range" id="contrast" min="-1" max="1" step="0.1" value="0"></div>
+      <div class="filter-control"><label>Saturação</label><input type="range" id="saturation" min="-1" max="1" step="0.1" value="0"></div>
+      <div class="filter-control"><label>Blur</label><input type="range" id="blur" min="0" max="1" step="0.05" value="0"></div>
+
+      <h3>Exportar</h3>
+      <button id="exportPNG">Salvar em PNG</button>
+      <button id="exportJPG">Salvar em JPG</button>
+      <button id="exportPDF">Salvar em PDF</button>
+
+      <h3>Selecionado</h3>
+      <div id="selInfo">Nenhum</div>
+      <button id="bringFront">Trazer para frente</button>
+      <button id="sendBack">Enviar para trás</button>
+      <button id="deleteObj" class="danger">Excluir</button>
+    </div>
+  </div>
+
+  <div id="canvas-wrap">
+    <div id="controls">
+      <strong>Editor de Fotos & Designer</strong>
+      <span style="flex:1"></span>
+      <label style="font-size:13px;color:#666">Tamanho:</label>
+      <select id="canvasSize">
+        <option value="800x600">800×600</option>
+        <option value="1024x768" selected>1024×768</option>
+        <option value="1280x720">1280×720</option>
+        <option value="1920x1080">1920×1080</option>
+      </select>
+    </div>
+    <canvas id="c" width="1024" height="768"></canvas>
+  </div>
+
+<script>
+const canvas = new fabric.Canvas('c', { backgroundColor:'#fff' });
+
+// Função para aplicar filtros
+function applyFilters(){
+  const obj = canvas.getActiveObject();
+  if(obj && obj.type==='image'){
+    obj.filters = [];
+    const brightness = parseFloat(document.getElementById('brightness').value);
+    const contrast = parseFloat(document.getElementById('contrast').value);
+    const saturation = parseFloat(document.getElementById('saturation').value);
+    const blur = parseFloat(document.getElementById('blur').value);
+
+    if(brightness!==0) obj.filters.push(new fabric.Image.filters.Brightness({ brightness }));
+    if(contrast!==0) obj.filters.push(new fabric.Image.filters.Contrast({ contrast }));
+    if(saturation!==0) obj.filters.push(new fabric.Image.filters.Saturation({ saturation }));
+    if(blur>0) obj.filters.push(new fabric.Image.filters.Blur({ blur }));
+
+    obj.applyFilters();
+    canvas.renderAll();
+  }
+}
+
+document.querySelectorAll('#brightness,#contrast,#saturation,#blur').forEach(input=>{
+  input.addEventListener('input', applyFilters);
+});
+
+// Exemplo: carregar imagem
+const imgUpload=document.getElementById('imgUpload');
+imgUpload.addEventListener('change', e=>{
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    fabric.Image.fromURL(ev.target.result, img=>{
+      img.scaleToWidth(400);
+      canvas.add(img).setActiveObject(img);
     });
-  </script>
+  };
+  reader.readAsDataURL(file);
+});
+</script>
 </body>
 </html>
