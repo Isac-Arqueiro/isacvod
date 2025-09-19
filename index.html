@@ -3,31 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Player Multi-Canal</title>
+    <title>Player Multi-Canal Avançado</title>
     <link rel="icon" type="image/png" href="/play-on.png">
     <style>
         body {
             margin: 0;
             background-color: #000;
             font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
             color: #fff;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background-color: #111;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 1.5em;
+        }
+        #search {
+            padding: 5px 10px;
+            font-size: 1em;
+            border-radius: 5px;
+            border: none;
+            outline: none;
         }
         #player-container {
             width: 90%;
             max-width: 1280px;
+            margin: 20px auto 0;
             aspect-ratio: 16 / 9;
-            margin-top: 20px;
+        }
+        #player {
+            width: 100%;
+            height: 100%;
         }
         #channel-list {
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
-            margin-top: 20px;
+            margin: 20px auto;
             gap: 15px;
+            width: 90%;
         }
         .channel {
             cursor: pointer;
@@ -48,32 +67,26 @@
             margin-top: 5px;
             font-size: 0.9em;
         }
+        .favorite {
+            border-color: gold !important;
+        }
     </style>
 </head>
 <body>
+
+<header>
     <h1>Player Multi-Canal</h1>
-    <div id="player-container">
-        <div id="player"></div>
-    </div>
+    <input type="text" id="search" placeholder="Buscar canal...">
+</header>
 
-    <div id="channel-list">
-        <!-- Miniaturas de canais -->
-        <div class="channel" onclick="playChannel(channels[0])">
-            <img src="/play-on.png" alt="Canal 1">
-            <div class="channel-name">Canal Pluto</div>
-        </div>
-        <div class="channel" onclick="playChannel(channels[1])">
-            <img src="/play-on.png" alt="Canal 2">
-            <div class="channel-name">Canal YouTube</div>
-        </div>
-        <div class="channel" onclick="playChannel(channels[2])">
-            <img src="/play-on.png" alt="Canal 3">
-            <div class="channel-name">Vídeo MP4</div>
-        </div>
-    </div>
+<div id="player-container">
+    <div id="player"></div>
+</div>
 
-    <!-- JW Player -->
-    <script src="/js/jwplayer.js"></script>
-    <script src="player.js"></script>
+<div id="channel-list"></div>
+
+<!-- JW Player -->
+<script src="/js/jwplayer.js"></script>
+<script src="player.js"></script>
 </body>
 </html>
