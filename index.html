@@ -4,31 +4,63 @@
   <meta charset="UTF-8">
   <title>Leitor Multiformato</title>
   <script src="https://cdn.jsdelivr.net/npm/clappr@latest/dist/clappr.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    #player { margin-top: 20px; }
+    ul { list-style: none; padding: 0; }
+    li { cursor: pointer; padding: 6px; border-bottom: 1px solid #ddd; }
+    li:hover { background: #f0f0f0; }
+    #busca { padding: 6px; width: 100%; margin-bottom: 10px; }
+  </style>
 </head>
 <body>
   <h2>Minha Lista</h2>
-  <input type="text" id="busca" placeholder="Pesquisar...">
+  <input type="text" id="busca" placeholder="Pesquisar canal...">
   <ul id="lista"></ul>
   <div id="player"></div>
 
 <script>
 const urlM3U = "http://facilita.fun//get.php?username=TeamKakashi&password=4321123&type=m3u_plus&output=m3u8";
 
-// salva no IndexedDB
-function salvarIndexedDB(itens) {
-  let req = indexedDB.open("meuPlayerDB", 1);
-  req.onupgradeneeded = e => {
-    let db = e.target.result;
-    db.createObjectStore("canais", { keyPath: "id", autoIncrement: true });
-  };
-  req.onsuccess = e => {
-    let db = e.target.result;
-    let tx = db.transaction("canais", "readwrite");
-    let store = tx.objectStore("canais");
-    itens.forEach(item => store.add(item));
-  };
+// ---- IndexedDB ----
+function abrirDB() {
+  return new Promise((resolve, reject) => {
+    let req = indexedDB.open("meuPlayerDB", 1);
+    req.onupgradeneeded = e => {
+      let db = e.target.result;
+      if (!db.objectStoreNames.contains("canais")) {
+        db.createObjectStore("canais", { keyPath: "id", autoIncrement: true });
+      }
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = e => reject(e);
+  });
 }
 
+async function salvarIndexedDB(itens) {
+  let db = await abrirDB();
+  let tx = db.transaction("canais", "readwrite");
+  let store = tx.objectStore("canais");
+  itens.forEach(item => store.add(item));
+}
+
+async function listarIndexedDB(filtro = "") {
+  let db = await abrirDB();
+  return new Promise(resolve => {
+    let tx = db.transaction("canais", "readonly");
+    let store = tx.objectStore("canais");
+    let req = store.getAll();
+    req.onsuccess = () => {
+      let dados = req.result;
+      if (filtro) {
+        dados = dados.filter(c => c.nome.toLowerCase().includes(filtro.toLowerCase()));
+      }
+      resolve(dados);
+    };
+  });
+}
+
+// ---- Processa M3U ----
 async function carregarM3U() {
   let txt = await fetch(urlM3U).then(r => r.text());
   let linhas = txt.split("\n");
@@ -43,14 +75,15 @@ async function carregarM3U() {
       itens.push(atual);
     }
   });
-  salvarIndexedDB(itens);
-  mostrarLista(itens);
+  await salvarIndexedDB(itens);
+  mostrarLista(await listarIndexedDB());
 }
 
+// ---- UI ----
 function mostrarLista(itens) {
   let lista = document.getElementById("lista");
   lista.innerHTML = "";
-  itens.forEach((item, i) => {
+  itens.forEach(item => {
     let li = document.createElement("li");
     li.textContent = item.nome;
     li.onclick = () => abrirPlayer(item.url);
@@ -68,7 +101,24 @@ function abrirPlayer(url) {
   });
 }
 
-carregarM3U();
+// ---- Inicialização ----
+(async function init() {
+  let dados = await listarIndexedDB();
+  if (dados.length === 0) {
+    console.log("Carregando lista do servidor...");
+    await carregarM3U();
+  } else {
+    console.log("Carregando lista do IndexedDB...");
+    mostrarLista(dados);
+  }
+})();
+
+// ---- Busca em tempo real ----
+document.getElementById("busca").addEventListener("input", async e => {
+  let filtro = e.target.value;
+  let dados = await listarIndexedDB(filtro);
+  mostrarLista(dados);
+});
 </script>
 </body>
 </html>
