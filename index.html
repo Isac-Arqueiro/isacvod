@@ -10,17 +10,41 @@
     ul { list-style: none; padding: 0; }
     li { cursor: pointer; padding: 6px; border-bottom: 1px solid #ddd; }
     li:hover { background: #f0f0f0; }
-    #busca { padding: 6px; width: 100%; margin-bottom: 10px; }
+    #busca { padding: 6px; width: 100%; margin: 10px 0; }
+    #progresso { margin: 10px 0; font-weight: bold; }
+    button { margin-right: 10px; padding: 6px 12px; cursor: pointer; }
   </style>
 </head>
 <body>
-  <h2>Minha Lista</h2>
-  <input type="text" id="busca" placeholder="Pesquisar canal...">
+  <h2>Minha Biblioteca</h2>
+
+  <!-- Opção 1: Buscar URL -->
+  <input type="text" id="urlInput" placeholder="Digite URL (.m3u, .m3u_plus ou .m3u8)">
+  <button onclick="carregarURL()">Buscar</button>
+
+  <!-- Opção 2: Lista interna -->
+  <button onclick="carregarListaInterna()">Lista Interna</button>
+
+  <div id="progresso"></div>
+
+  <!-- Campo de pesquisa -->
+  <input type="text" id="busca" placeholder="Pesquisar filme...">
+
+  <!-- Lista de filmes -->
   <ul id="lista"></ul>
+
+  <!-- Player -->
   <div id="player"></div>
 
 <script>
-const urlM3U = "http://facilita.fun//get.php?username=TeamKakashi&password=4321123&type=m3u_plus&output=m3u8";
+// Lista interna de exemplo (canais ao vivo)
+const listaInterna = `
+#EXTM3U
+#EXTINF:-1 tvg-logo="https://upload.wikimedia.org/wikipedia/commons/6/6c/TVGlobo.png", Globo
+https://video-exemplo.com/globo.m3u8
+#EXTINF:-1 tvg-logo="https://upload.wikimedia.org/wikipedia/commons/1/1b/SBT_logo.png", SBT
+https://video-exemplo.com/sbt.m3u8
+`;
 
 // ---- IndexedDB ----
 function abrirDB() {
@@ -28,8 +52,8 @@ function abrirDB() {
     let req = indexedDB.open("meuPlayerDB", 1);
     req.onupgradeneeded = e => {
       let db = e.target.result;
-      if (!db.objectStoreNames.contains("canais")) {
-        db.createObjectStore("canais", { keyPath: "id", autoIncrement: true });
+      if (!db.objectStoreNames.contains("conteudos")) {
+        db.createObjectStore("conteudos", { keyPath: "id", autoIncrement: true });
       }
     };
     req.onsuccess = e => resolve(e.target.result);
@@ -39,16 +63,20 @@ function abrirDB() {
 
 async function salvarIndexedDB(itens) {
   let db = await abrirDB();
-  let tx = db.transaction("canais", "readwrite");
-  let store = tx.objectStore("canais");
+  let tx = db.transaction("conteudos", "readwrite");
+  let store = tx.objectStore("conteudos");
+  await new Promise(r => {
+    let clear = store.clear();
+    clear.onsuccess = () => r();
+  });
   itens.forEach(item => store.add(item));
 }
 
 async function listarIndexedDB(filtro = "") {
   let db = await abrirDB();
   return new Promise(resolve => {
-    let tx = db.transaction("canais", "readonly");
-    let store = tx.objectStore("canais");
+    let tx = db.transaction("conteudos", "readonly");
+    let store = tx.objectStore("conteudos");
     let req = store.getAll();
     req.onsuccess = () => {
       let dados = req.result;
@@ -60,23 +88,63 @@ async function listarIndexedDB(filtro = "") {
   });
 }
 
-// ---- Processa M3U ----
-async function carregarM3U() {
-  let txt = await fetch(urlM3U).then(r => r.text());
+// ---- Processa M3U (filmes/séries) ----
+function processarM3U(txt) {
   let linhas = txt.split("\n");
   let itens = [];
   let atual = {};
-  linhas.forEach(l => {
+  let total = linhas.length;
+  linhas.forEach((l, i) => {
     if (l.startsWith("#EXTINF")) {
       let nome = l.split(",")[1];
-      atual = { nome };
+      let logo = "";
+      let match = l.match(/tvg-logo="(.*?)"/);
+      if (match) logo = match[1];
+      atual = { nome, logo, tipo: "filme" };
     } else if (l.startsWith("http")) {
       atual.url = l.trim();
       itens.push(atual);
     }
+    document.getElementById("progresso").textContent =
+      "Processando: " + Math.round((i / total) * 100) + "%";
   });
-  await salvarIndexedDB(itens);
-  mostrarLista(await listarIndexedDB());
+  document.getElementById("progresso").textContent = "Finalizado!";
+  return itens;
+}
+
+// ---- Carregar URL ----
+async function carregarURL() {
+  let url = document.getElementById("urlInput").value.trim();
+  if (!url) {
+    alert("Digite uma URL válida!");
+    return;
+  }
+
+  // Se for canal ao vivo (.m3u8) → abre direto
+  if (url.endsWith(".m3u8")) {
+    document.getElementById("progresso").textContent = "Abrindo canal ao vivo...";
+    abrirPlayer(url);
+    return;
+  }
+
+  // Caso contrário → assume lista de filmes/séries (.m3u ou .m3u_plus)
+  document.getElementById("progresso").textContent = "Carregando lista de filmes...";
+  try {
+    let txt = await fetch(url).then(r => r.text());
+    let itens = processarM3U(txt);
+    await salvarIndexedDB(itens);
+    mostrarLista(await listarIndexedDB());
+  } catch (e) {
+    document.getElementById("progresso").textContent = "Erro ao carregar lista!";
+  }
+}
+
+// ---- Lista interna (canais) ----
+async function carregarListaInterna() {
+  document.getElementById("progresso").textContent = "Carregando lista interna (canais)...";
+  let itens = processarM3U(listaInterna);
+  // Aqui não salva no DB → canais não ficam armazenados
+  mostrarListaCanais(itens);
 }
 
 // ---- UI ----
@@ -85,7 +153,20 @@ function mostrarLista(itens) {
   lista.innerHTML = "";
   itens.forEach(item => {
     let li = document.createElement("li");
-    li.textContent = item.nome;
+    li.innerHTML = (item.logo ? `<img src="${item.logo}" width="30" style="vertical-align:middle;margin-right:8px">` : "") +
+                   "🎬 " + item.nome;
+    li.onclick = () => abrirPlayer(item.url);
+    lista.appendChild(li);
+  });
+}
+
+function mostrarListaCanais(itens) {
+  let lista = document.getElementById("lista");
+  lista.innerHTML = "";
+  itens.forEach(item => {
+    let li = document.createElement("li");
+    li.innerHTML = (item.logo ? `<img src="${item.logo}" width="30" style="vertical-align:middle;margin-right:8px">` : "") +
+                   "📺 " + item.nome;
     li.onclick = () => abrirPlayer(item.url);
     lista.appendChild(li);
   });
@@ -101,19 +182,7 @@ function abrirPlayer(url) {
   });
 }
 
-// ---- Inicialização ----
-(async function init() {
-  let dados = await listarIndexedDB();
-  if (dados.length === 0) {
-    console.log("Carregando lista do servidor...");
-    await carregarM3U();
-  } else {
-    console.log("Carregando lista do IndexedDB...");
-    mostrarLista(dados);
-  }
-})();
-
-// ---- Busca em tempo real ----
+// ---- Busca ----
 document.getElementById("busca").addEventListener("input", async e => {
   let filtro = e.target.value;
   let dados = await listarIndexedDB(filtro);
