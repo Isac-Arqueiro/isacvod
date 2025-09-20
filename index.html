@@ -2,12 +2,15 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Leitor de Filmes</title>
+  <title>Leitor de Filmes Fullscreen</title>
   <script src="https://cdn.jsdelivr.net/npm/clappr@latest/dist/clappr.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; background: #f8f8f8; }
     h2 { text-align: center; }
-    #player { margin-top: 20px; }
+    #playerContainer { position: relative; margin-top: 20px; }
+    #player { width: 100%; height: 480px; background: black; }
+    #controls { margin-top: 10px; text-align: center; }
+    button { padding: 8px 16px; margin: 0 6px; cursor: pointer; }
     .item { display: flex; align-items: center; padding: 6px; border-bottom: 1px solid #ddd; cursor: pointer; background: #fff; margin-bottom: 4px; border-radius: 4px; }
     .item:hover { background: #e6e6e6; }
     .item img { width: 60px; height: 90px; object-fit: cover; margin-right: 10px; border-radius: 4px; }
@@ -16,11 +19,10 @@
     .categoria { font-size: 12px; color: gray; }
     .botoes { margin-bottom: 10px; text-align: center; }
     input { padding: 6px; width: 60%; margin-right: 6px; }
-    button { padding: 6px 12px; cursor: pointer; margin-right: 6px; }
   </style>
 </head>
 <body>
-  <h2>🎬 Leitor de Filmes</h2>
+  <h2>🎬 Leitor de Filmes Fullscreen</h2>
 
   <div class="botoes">
     <button onclick="mostrarListaInterna()">Lista Interna</button>
@@ -29,7 +31,14 @@
   </div>
 
   <div id="lista"></div>
-  <div id="player"></div>
+
+  <div id="playerContainer">
+    <div id="player"></div>
+    <div id="controls" style="display:none;">
+      <button onclick="pausarFilme()">⏸ Pausar</button>
+      <button onclick="pararFilme()">⏹ Parar</button>
+    </div>
+  </div>
 
 <script>
 // =============================
@@ -44,6 +53,9 @@ http://facilita.fun:80/movie/TeamKakashi/4321123/11286540.mp4
 #EXTINF:-1 tvg-name="O Inimigo Está Por Perto (2023)" tvg-logo="https://image.tmdb.org/t/p/w600_and_h900_bestv2/bc6CI6cTv30SDWtSutfHb6aGix.jpg" group-title="FILMES | SUGESTÃO DA SEMANA",O Inimigo Está Por Perto (2023)
 http://facilita.fun:80/movie/TeamKakashi/4321123/11286541.mp4
 `;
+
+let player = null; // instância do Clappr
+let filmeAtual = null;
 
 // =============================
 // FUNÇÃO: PROCESSAR M3U
@@ -93,25 +105,47 @@ function mostrarListaInterna() {
 }
 
 // =============================
-// FUNÇÃO: ABRIR PLAYER
+// FUNÇÃO: ABRIR PLAYER FULLSCREEN
 // =============================
 function abrirPlayer(url) {
+  filmeAtual = url;
+  document.getElementById("controls").style.display = "block";
   document.getElementById("player").innerHTML = "";
-  new Clappr.Player({
+  player = new Clappr.Player({
     source: url,
     parentId: "#player",
     width: "100%",
-    height: 480
+    height: window.innerHeight,
+    autoPlay: true
   });
+  // Pedir fullscreen
+  const elem = document.getElementById("player");
+  if (elem.requestFullscreen) elem.requestFullscreen();
+  else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+  else if (elem.msRequestFullscreen) elem.msRequestFullscreen();
 }
 
 // =============================
-// FUNÇÃO: ADICIONAR FILME
+// CONTROLES
+// =============================
+function pausarFilme() {
+  if (player) player.pause();
+}
+
+function pararFilme() {
+  if (player) {
+    player.stop();
+    document.getElementById("player").innerHTML = "";
+    document.getElementById("controls").style.display = "none";
+  }
+}
+
+// =============================
+// ADICIONAR FILME
 // =============================
 function adicionarFilme() {
   let url = document.getElementById("novaURL").value.trim();
   if (!url) return alert("Digite a URL do filme");
-  // Adiciona um item simples sem logo e sem grupo
   listaFilmes += `#EXTINF:-1,tvg-name="Novo Filme" group-title="FILMES ADICIONADOS",Novo Filme\n${url}\n`;
   document.getElementById("novaURL").value = "";
   mostrarListaInterna();
