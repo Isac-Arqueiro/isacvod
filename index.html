@@ -2,176 +2,99 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Leitor Multiformato</title>
+  <title>Leitor de Filmes</title>
   <script src="https://cdn.jsdelivr.net/npm/clappr@latest/dist/clappr.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f8f8f8; }
+    h2 { text-align: center; }
     #player { margin-top: 20px; }
-    ul { list-style: none; padding: 0; }
-    li { cursor: pointer; padding: 6px; border-bottom: 1px solid #ddd; }
-    li:hover { background: #f0f0f0; }
-    #busca { padding: 6px; width: 100%; margin: 10px 0; }
-    #progresso { margin: 10px 0; font-weight: bold; }
-    button { margin-right: 10px; padding: 6px 12px; cursor: pointer; }
+    .item { display: flex; align-items: center; padding: 6px; border-bottom: 1px solid #ddd; cursor: pointer; background: #fff; margin-bottom: 4px; border-radius: 4px; }
+    .item:hover { background: #e6e6e6; }
+    .item img { width: 60px; height: 90px; object-fit: cover; margin-right: 10px; border-radius: 4px; }
+    .info { display: flex; flex-direction: column; }
+    .nome { font-weight: bold; }
+    .categoria { font-size: 12px; color: gray; }
+    .botoes { margin-bottom: 10px; text-align: center; }
+    input { padding: 6px; width: 60%; margin-right: 6px; }
+    button { padding: 6px 12px; cursor: pointer; margin-right: 6px; }
   </style>
 </head>
 <body>
-  <h2>Minha Biblioteca</h2>
+  <h2>🎬 Leitor de Filmes</h2>
 
-  <!-- Opção 1: Buscar URL -->
-  <input type="text" id="urlInput" placeholder="Digite URL (.m3u, .m3u_plus ou .m3u8)">
-  <button onclick="carregarURL()">Buscar</button>
+  <div class="botoes">
+    <button onclick="mostrarListaInterna()">Lista Interna</button>
+    <input type="text" id="novaURL" placeholder="Adicionar URL de filme (.mp4, .mkv...)">
+    <button onclick="adicionarFilme()">Adicionar Filme</button>
+  </div>
 
-  <!-- Opção 2: Lista interna -->
-  <button onclick="carregarListaInterna()">Lista Interna</button>
-
-  <div id="progresso"></div>
-
-  <!-- Campo de pesquisa -->
-  <input type="text" id="busca" placeholder="Pesquisar filme...">
-
-  <!-- Lista de filmes -->
-  <ul id="lista"></ul>
-
-  <!-- Player -->
+  <div id="lista"></div>
   <div id="player"></div>
 
 <script>
-// Lista interna de exemplo (canais ao vivo)
-const listaInterna = `
-#EXTM3U
-#EXTINF:-1 tvg-logo="https://upload.wikimedia.org/wikipedia/commons/6/6c/TVGlobo.png", Globo
-https://video-exemplo.com/globo.m3u8
-#EXTINF:-1 tvg-logo="https://upload.wikimedia.org/wikipedia/commons/1/1b/SBT_logo.png", SBT
-https://video-exemplo.com/sbt.m3u8
+// =============================
+// LISTA INTERNA INICIAL
+// =============================
+let listaFilmes = `#EXTINF:-1 tvg-name="Premonição 6: Laços de Sangue (2025)" tvg-logo="https://image.tmdb.org/t/p/w600_and_h900_bestv2/niTRdfNCT29PXU9YpPPuISrBIw7.jpg" group-title="FILMES | 4K",Premonição 6: Laços de Sangue (2025)
+http://facilita.fun:80/movie/TeamKakashi/4321123/11286529.mp4
+#EXTINF:-1 tvg-name="Missão Resgate: Vingança (2025)" tvg-logo="https://image.tmdb.org/t/p/w600_and_h900_bestv2/sPTeizmI8p40oEuvbIc2B3H5mg6.jpg" group-title="FILMES | LEGENDADOS",Missão Resgate: Vingança (2025)
+http://facilita.fun:80/movie/TeamKakashi/4321123/11286536.mp4
+#EXTINF:-1 tvg-name="Hurry Up Tomorrow: Além dos Holofotes (2025)" tvg-logo="https://image.tmdb.org/t/p/w600_and_h900_bestv2/jZJgfez0ilFqtJKljCigK4YbB1v.jpg" group-title="FILMES | SUGESTÃO DA SEMANA",Hurry Up Tomorrow: Além dos Holofotes (2025)
+http://facilita.fun:80/movie/TeamKakashi/4321123/11286540.mp4
+#EXTINF:-1 tvg-name="O Inimigo Está Por Perto (2023)" tvg-logo="https://image.tmdb.org/t/p/w600_and_h900_bestv2/bc6CI6cTv30SDWtSutfHb6aGix.jpg" group-title="FILMES | SUGESTÃO DA SEMANA",O Inimigo Está Por Perto (2023)
+http://facilita.fun:80/movie/TeamKakashi/4321123/11286541.mp4
 `;
 
-// ---- IndexedDB ----
-function abrirDB() {
-  return new Promise((resolve, reject) => {
-    let req = indexedDB.open("meuPlayerDB", 1);
-    req.onupgradeneeded = e => {
-      let db = e.target.result;
-      if (!db.objectStoreNames.contains("conteudos")) {
-        db.createObjectStore("conteudos", { keyPath: "id", autoIncrement: true });
-      }
-    };
-    req.onsuccess = e => resolve(e.target.result);
-    req.onerror = e => reject(e);
-  });
-}
-
-async function salvarIndexedDB(itens) {
-  let db = await abrirDB();
-  let tx = db.transaction("conteudos", "readwrite");
-  let store = tx.objectStore("conteudos");
-  await new Promise(r => {
-    let clear = store.clear();
-    clear.onsuccess = () => r();
-  });
-  itens.forEach(item => store.add(item));
-}
-
-async function listarIndexedDB(filtro = "") {
-  let db = await abrirDB();
-  return new Promise(resolve => {
-    let tx = db.transaction("conteudos", "readonly");
-    let store = tx.objectStore("conteudos");
-    let req = store.getAll();
-    req.onsuccess = () => {
-      let dados = req.result;
-      if (filtro) {
-        dados = dados.filter(c => c.nome.toLowerCase().includes(filtro.toLowerCase()));
-      }
-      resolve(dados);
-    };
-  });
-}
-
-// ---- Processa M3U (filmes/séries) ----
+// =============================
+// FUNÇÃO: PROCESSAR M3U
+// =============================
 function processarM3U(txt) {
   let linhas = txt.split("\n");
   let itens = [];
   let atual = {};
-  let total = linhas.length;
-  linhas.forEach((l, i) => {
+  linhas.forEach(l => {
     if (l.startsWith("#EXTINF")) {
-      let nome = l.split(",")[1];
-      let logo = "";
-      let match = l.match(/tvg-logo="(.*?)"/);
-      if (match) logo = match[1];
-      atual = { nome, logo, tipo: "filme" };
+      let logoMatch = l.match(/tvg-logo="(.*?)"/);
+      let nomeMatch = l.match(/tvg-name="(.*?)"/);
+      let grupoMatch = l.match(/group-title="(.*?)"/);
+      atual = {
+        nome: nomeMatch ? nomeMatch[1] : "Sem nome",
+        logo: logoMatch ? logoMatch[1] : "https://via.placeholder.com/100?text=SEM+LOGO",
+        categoria: grupoMatch ? grupoMatch[1] : "Sem categoria"
+      };
     } else if (l.startsWith("http")) {
       atual.url = l.trim();
       itens.push(atual);
     }
-    document.getElementById("progresso").textContent =
-      "Processando: " + Math.round((i / total) * 100) + "%";
   });
-  document.getElementById("progresso").textContent = "Finalizado!";
   return itens;
 }
 
-// ---- Carregar URL ----
-async function carregarURL() {
-  let url = document.getElementById("urlInput").value.trim();
-  if (!url) {
-    alert("Digite uma URL válida!");
-    return;
-  }
-
-  // Se for canal ao vivo (.m3u8) → abre direto
-  if (url.endsWith(".m3u8")) {
-    document.getElementById("progresso").textContent = "Abrindo canal ao vivo...";
-    abrirPlayer(url);
-    return;
-  }
-
-  // Caso contrário → assume lista de filmes/séries (.m3u ou .m3u_plus)
-  document.getElementById("progresso").textContent = "Carregando lista de filmes...";
-  try {
-    let txt = await fetch(url).then(r => r.text());
-    let itens = processarM3U(txt);
-    await salvarIndexedDB(itens);
-    mostrarLista(await listarIndexedDB());
-  } catch (e) {
-    document.getElementById("progresso").textContent = "Erro ao carregar lista!";
-  }
-}
-
-// ---- Lista interna (canais) ----
-async function carregarListaInterna() {
-  document.getElementById("progresso").textContent = "Carregando lista interna (canais)...";
-  let itens = processarM3U(listaInterna);
-  // Aqui não salva no DB → canais não ficam armazenados
-  mostrarListaCanais(itens);
-}
-
-// ---- UI ----
-function mostrarLista(itens) {
-  let lista = document.getElementById("lista");
-  lista.innerHTML = "";
+// =============================
+// FUNÇÃO: MOSTRAR LISTA
+// =============================
+function mostrarListaInterna() {
+  const itens = processarM3U(listaFilmes);
+  let div = document.getElementById("lista");
+  div.innerHTML = "";
   itens.forEach(item => {
-    let li = document.createElement("li");
-    li.innerHTML = (item.logo ? `<img src="${item.logo}" width="30" style="vertical-align:middle;margin-right:8px">` : "") +
-                   "🎬 " + item.nome;
-    li.onclick = () => abrirPlayer(item.url);
-    lista.appendChild(li);
+    let el = document.createElement("div");
+    el.className = "item";
+    el.innerHTML = `
+      <img src="${item.logo}">
+      <div class="info">
+        <div class="nome">${item.nome}</div>
+        <div class="categoria">${item.categoria}</div>
+      </div>
+    `;
+    el.onclick = () => abrirPlayer(item.url);
+    div.appendChild(el);
   });
 }
 
-function mostrarListaCanais(itens) {
-  let lista = document.getElementById("lista");
-  lista.innerHTML = "";
-  itens.forEach(item => {
-    let li = document.createElement("li");
-    li.innerHTML = (item.logo ? `<img src="${item.logo}" width="30" style="vertical-align:middle;margin-right:8px">` : "") +
-                   "📺 " + item.nome;
-    li.onclick = () => abrirPlayer(item.url);
-    lista.appendChild(li);
-  });
-}
-
+// =============================
+// FUNÇÃO: ABRIR PLAYER
+// =============================
 function abrirPlayer(url) {
   document.getElementById("player").innerHTML = "";
   new Clappr.Player({
@@ -182,12 +105,17 @@ function abrirPlayer(url) {
   });
 }
 
-// ---- Busca ----
-document.getElementById("busca").addEventListener("input", async e => {
-  let filtro = e.target.value;
-  let dados = await listarIndexedDB(filtro);
-  mostrarLista(dados);
-});
+// =============================
+// FUNÇÃO: ADICIONAR FILME
+// =============================
+function adicionarFilme() {
+  let url = document.getElementById("novaURL").value.trim();
+  if (!url) return alert("Digite a URL do filme");
+  // Adiciona um item simples sem logo e sem grupo
+  listaFilmes += `#EXTINF:-1,tvg-name="Novo Filme" group-title="FILMES ADICIONADOS",Novo Filme\n${url}\n`;
+  document.getElementById("novaURL").value = "";
+  mostrarListaInterna();
+}
 </script>
 </body>
 </html>
